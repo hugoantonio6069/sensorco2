@@ -1,20 +1,9 @@
 import time
 import random
 import math
-import sqlite3
+import pandas as pd
 from datetime import datetime
-
-conn = sqlite3.connect("sensor.db")
-c = conn.cursor()
-
-c.execute("""
-CREATE TABLE IF NOT EXISTS dados (
-    timestamp TEXT,
-    co2 REAL
-)
-""")
-
-conn.commit()
+import os
 
 sensor_val = random.uniform(500, 800)
 drift = 0
@@ -22,7 +11,7 @@ drift = 0
 def gerar_valor(t):
     global sensor_val, drift
 
-    drift += random.uniform(-1, 1)
+    drift += random.uniform(-1.0, 1.0)
 
     regime = math.sin(t / 300)
     amplitude = 200 + 300 * abs(regime)
@@ -34,20 +23,23 @@ def gerar_valor(t):
     novo = sensor_val + onda * 0.15 + ruido + choque + drift
 
     novo = max(200, min(1200, novo))
-
     sensor_val = novo
+
     return novo
 
-t = 0
 
 while True:
+    t = time.time()
     valor = gerar_valor(t)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now()
 
-    c.execute("INSERT INTO dados VALUES (?, ?)", (timestamp, valor))
-    conn.commit()
+    linha = pd.DataFrame([{
+        "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+        "co2": round(valor, 2)
+    }])
 
-    print(timestamp, valor)
+    arquivo = "dados_tempo_real.csv"
+    linha.to_csv(arquivo, mode="a", header=not os.path.exists(arquivo), index=False)
 
-    t += 1
+    print("CO2:", round(valor, 2))
     time.sleep(1)
